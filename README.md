@@ -1,10 +1,10 @@
 ## Project Title: Home Credit Default Risk
 ## Table of Contents
 - [Summary](#summary)
-- [Project Objective](#project Objective)
+- [Project Objective](#projectObjective)
 - [Solution](#solution)
 - [Contribution](#contribution)
-- [Business Values](#business Values)
+- [Business Values](#businessValues)
 - [Challenges](#challenges)
 - [Learnings](#learnings)
 ### Summary
