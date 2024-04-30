@@ -1,0 +1,198 @@
+---
+title: "EDA_Kritika"
+author: "Kritika"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Home Credit, a financial institution committed to providing a secure borrowing experience for unbanked customers, is facing a significant challenge in efficiently predicting customers' repayment capabilities. The core issue lies in minimizing the rejection rate for customers with limited credit history by leveraging advanced statistical models and preventing people from untrustworthy lenders. The business problem necessitates a comprehensive approach involving exploring historical data through advanced analytics to make fair lending decisions.
+
+The Exploratory Data Analysis (EDA) notebook aims to completely analyze and comprehend the dataset at hand, specifically the application_train.csv files, possibly in combination with transactional data such as bureau.csv or previous_application.csv. This investigation seeks to unearth insights, identify patterns, and detect anomalies or flaws in the data that may affect the building of predictive models. The ultimate goal is to inform the next steps in data pretreatment, feature engineering, and model selection to solve a specific business or analytic challenge.
+
+Below are the questions that we will be exploring:
+
+1. Is the target variable imbalanced, and if so, how does this impact model training and evaluation?
+2. How does the target variable relate to potential predictors in the application data?
+3. How often is missing data in application datasets, and what solutions (such as row/column removal and imputation) could be used to address it?
+4. Are there any obvious data quality issues, such as nonsensical numbers, outliers, or columns with near-zero variance, that must be addressed?
+5. Will the input data need to be transformed (for example, normalized or encoded categorical variables) before it can be used in multiple models?
+6. How may transactional data from other sources (e.g., bureau.csv, previous_application.csv) be combined with application data, and what insights does the resulting information provide?
+
+
+## Description of the Data
+
+Data consists of 7 different data sets from which we will be working mainly with application_train, bureau, and previous_application data set.
+
+1. application_train.csv: These files contain static data for loan applications. The training set includes a target variable indicating whether the applicant defaulted on the loan. The test set does not include this target variable and is used to assess the performance of the predictive model.
+
+2. bureau.csv: This file contains information about the client's previous credits from other financial institutions, as reported to a credit bureau. This data is crucial for understanding an applicant's credit history outside of the loans provided by Home Credit.
+
+3. bureau_balance.csv: This file provides monthly balances for each credit the client had as reported to the credit bureau. It offers a detailed view of the client's credit history over time, which can be valuable for assessing their creditworthiness.
+
+4. POS_CASH_balance.csv: This file contains monthly balance snapshots of previous POS and cash loans that the applicant had with Home Credit. It shows the client's behavior regarding the repayment of these particular types of loans.
+
+5. credit_card_balance.csv: Similar to the POS_CASH_balance file, this one provides monthly balance snapshots but for credit cards that the applicant has with Home Credit. It can give insights into the client's use and management of credit card debt.
+
+6. previous_application.csv: This file lists all previous loan applications made by clients to Home Credit. It can be used to understand the client's previous interactions with Home Credit and their loan application outcomes.
+
+7. installments_payments.csv: This file tracks the repayment history for previously disbursed credits in Home Credit, including both made and missed payments. This data is essential for modeling as it directly relates to the client's repayment behavior.
+
+
+## Data Preparation
+```{r}
+#loading libraries
+library(tidyverse)
+library(ggplot2)
+library(glmnet)
+library(caret)
+library(skimr)
+library(dplyr)
+library(janitor)
+#loading the data
+train <- read.csv("application_train.csv")
+test <- read.csv("application_test.csv")
+bureau <- read.csv("bureau.csv")
+previous_app <- read.csv("previous_application.csv")
+```
+
+
+```{r}
+#viewing the dataset
+summary(train)
+head(train)
+```
+
+## EDA
+
+```{r}
+# Explore target variable
+table(train$TARGET)
+
+# determine the accuracy of majority class
+majority_class <- max(table(train$TARGET))
+accuracy_majority_class <- majority_class / nrow(train)
+print(paste("Accuracy of majority class classifier is:", accuracy_majority_class))
+
+```
+
+So, from the above output, the number of people who will not repay the loan on time will be 24825 and the number of people who will repay the loan will be 282686. So, it indicates that our dataset is highly unbalanced with around 91.93% of cases falling into the majority category (0) and merely about 8.07% categorized under the minority class (1).
+
+It achieves an accuracy rate close to 91.93%. Despite this seemingly high level of accuracy, it's crucial to recognize that such a model would fail to offer valuable predictions for the less represented class (class 1), which is typically of greater interest in scenarios like predicting loan defaults.
+
+```{r}
+#converting character variables to factor variables.
+train$TARGET <- as.factor(train$TARGET)
+train$CODE_GENDER <- as.factor(train$CODE_GENDER)
+train$FLAG_OWN_CAR <- as.factor(train$FLAG_OWN_CAR)
+train$FLAG_OWN_REALTY <- as.factor(train$FLAG_OWN_REALTY)
+train$FLAG_PHONE <- as.factor(train$FLAG_PHONE)
+train$FLAG_MOBIL <- as.factor(train$FLAG_MOBIL)
+train$FLAG_EMP_PHONE <- as.factor(train$FLAG_EMP_PHONE)
+train$FLAG_WORK_PHONE <- as.factor(train$FLAG_WORK_PHONE)
+train$FLAG_CONT_MOBILE <- as.factor(train$FLAG_CONT_MOBILE)
+train$FLAG_PHONE <- as.factor(train$FLAG_PHONE)
+train$FLAG_EMAIL <- as.factor(train$FLAG_EMAIL)
+train$OWN_CAR_AGE <- as.numeric(train$OWN_CAR_AGE)
+
+```
+
+```{r}
+# Cleaning data using skimr and janitor package
+
+#skim the data to get the overview
+skim(train)
+
+# Clean column names to make them more consistent and readable
+train <- train %>% clean_names()
+
+# removing empty columns using janitor
+train <- train%>% remove_empty("cols")
+
+# removing empty rows using janitor
+train <- train %>% remove_empty("rows")
+
+summary(train)
+```
+As per the observation, occupation_type exhibits 31.53% missing values, and name_type_suite shows a significantly lower percentage of missing values at 0.42%.
+
+For variables like occupation_type and name_type_suite, where missing values are below 50%, we have viable options to retain these variables in our analysis. Imputation strategies, such as median or mode imputation for numerical and categorical variables respectively, or more sophisticated methods like predictive modeling or K-nearest neighbors (KNN), could be applied to fill in missing data, ensuring these predictors can still contribute valuable insights.
+
+Conversely, variables with missing data exceeding 50%, including fondkapremont_mode, housetype_mode, and wallsmaterial_mode, necessitate a more cautious approach. The viability of these predictors should be assessed based on their relevance to the research questions or objectives at hand. If deemed critical, advanced imputation techniques or domain-specific methods might be employed to salvage these variables. Otherwise, considering the removal of these variables from the dataset might be a pragmatic choice to maintain data integrity and analysis efficiency. 
+
+## Dealing with NA's
+```{r}
+train <- clean_names(train)
+
+sapply(train,function(x) sum(is.na(x)))
+```
+The dataset exhibits a diverse pattern of missing data across various features. Key identifiers and outcome variables, such as sk_id_curr, target, and name_contract_type, are fully populated with no missing entries. This ensures that essential information for each loan and its associated outcome is intact.
+
+On the other hand, some variables display a considerable number of missing entries. For instance, own_car_age and ext_source_1 are missing over 173,000 and 202,929 values, respectively, indicating a significant fraction of the dataset lacks these details.
+
+A moderate amount of missing data is observed in features like ext_source_2 and ext_source_3, with 660 and 60,965 missing entries, respectively. These variables may still be salvageable with the application of suitable imputation techniques.
+
+A few variables, such as amt_annuity and amt_goods_price, have a minimal count of missing values, 12 and 278 respectively. The scarcity of missing data in these variables suggests they can be easily addressed through imputation.
+
+Regarding credit bureau data, the uniform number of missing values (41,519) across several inquiry-related variables (amt_req_credit_bureau_hour, day, week, mon, qrt, year) indicates a potential pattern. This could be related to a segment of individuals who did not have any credit bureau inquiries during the specified period.
+
+```{r}
+#omitting rows with NA,
+mean(train$target == '1')
+```
+
+```{r}
+na.omit(train) %>%
+  count(target) %>%
+  mutate(n/sum(n))
+```
+This reveals that, after excluding rows with missing data from the dataset (`at`), the vast majority of records (approximately 94%) are classified under the `target` category 0, with only around 6% categorized as `target` 1. Such a pronounced disparity between the two categories suggests a significant imbalance, a situation frequently encountered in various practical contexts including fraud detection, predicting loan defaults, and diagnosing medical conditions. Addressing imbalanced datasets is crucial during the model development phase to prevent the model from developing a bias towards the more prevalent class.
+
+## Visualizing the data
+
+```{r}
+# Percentage of contracts by type
+ggplot(train, aes(x = name_contract_type, group = target)) + 
+  geom_bar(aes(y = ..prop.., fill = factor(..x..)),stat = "count") +
+  scale_y_continuous(labels=scales::percent, breaks = scales::pretty_breaks((n= 10))) +
+  ylab("relative frequencies") + facet_grid(~target) + labs(title ="Percentage of contracts by type", x = "Target", y ="% of contracts") + 
+  scale_fill_discrete(name = "Contract Type")
+```
+
+In the visual analysis of our dataset, we see that cash loans, indicated as 'Contract Type 1', are much more common than revolving loans, 'Contract Type 2', across both groups described by the target variable. Specifically, among consumers who have repaid their debts (goal = 0), around 90% had cash loans and the remaining 10% had revolving loans. In contrast, consumers that defaulted (goal = 1) received approximately 85% cash loans and 15% revolving loans. This distribution reveals a potential trend in which clients with revolving loans are slightly more likely to default, which could be useful for risk assessment in credit lending.
+
+```{r}
+#checking for zero variance columns
+numeric_cols <- sapply(train, is.numeric)
+zero_var_cols <- sapply(train[numeric_cols], function(x) var(x, na.rm = TRUE)) == 0
+
+# Print names of numeric columns with zero variance
+print(names(train[numeric_cols])[zero_var_cols])
+
+```
+
+The result character(0) reveals that in the train_clean dataset, none of the columns have a variance of zero, indicating that every column contains values that vary. This means there isn't a single column in the dataset where all entries are identical. Therefore, from the perspective of variance, there's no need to eliminate any columns from the dataset for being non-variable. This outcome suggests that every attribute in your dataset could potentially offer valuable insights for your analysis or predictive models, given that each possesses some degree of variability. 
+
+```{r}
+#aggregating the data
+bureau_aggregated <- bureau %>%
+  group_by(SK_ID_CURR) %>%
+  summarise(
+    total_loan_count = n(), # Count total loans per applicant
+    avg_loan_amount = mean(AMT_CREDIT_SUM, na.rm = TRUE), # Average loan amount
+    max_loan_amount = max(AMT_CREDIT_SUM, na.rm = TRUE) # Maximum loan amount
+    
+  )
+head(bureau_aggregated)
+```
+
+## Summary and Findings
+
+Our dataset presents a significant imbalance with the majority of clients (91.93%) likely to repay loans on time, while a smaller fraction (8.07%) might default. This imbalance poses a challenge for predictive modeling, as it risks neglecting the critical minority defaulting class. Some features in the dataset are marred by a high rate of missing values, warranting strategic imputation or potential omission based on their analytical value. Uniform gaps in credit bureau inquiries hint at a distinct client segment. Effective data preparation is crucial for creating reliable and meaningful predictive models.
